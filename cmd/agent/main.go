@@ -6,15 +6,19 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 )
 
 func main() {
-	// флаги
 	addr := flag.String("a", "http://localhost:8080", "server address")
 	reportInt := flag.Int("r", 10, "report interval in seconds")
 	pollInt := flag.Int("p", 2, "poll interval in seconds")
 	flag.Parse()
+
+	if !strings.HasPrefix(*addr, "http://") && !strings.HasPrefix(*addr, "https://") {
+		*addr = "http://" + *addr
+	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
 
