@@ -17,7 +17,6 @@ func main() {
 	flag.Parse()
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	rand.Seed(time.Now().UnixNano())
 
 	pollInterval := time.Duration(*pollInt) * time.Second
 	reportInterval := time.Duration(*reportInt) * time.Second
