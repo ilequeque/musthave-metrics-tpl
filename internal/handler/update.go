@@ -47,7 +47,7 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 	case repository.Gauge:
 		if val, ok := h.st.GetGauge(name); ok {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "%f", val)
+			fmt.Fprintf(w, "%g", val) // ✅ меняем %f → %g
 		} else {
 			http.NotFound(w, r)
 		}
