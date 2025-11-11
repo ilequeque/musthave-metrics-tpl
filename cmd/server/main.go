@@ -1,30 +1,28 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ilequeque/musthave-metrics-tpl/internal/config"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/handler"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/repository"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/service"
 )
 
 func main() {
-	addr := flag.String("a", "localhost:8080", "address for HTTP server")
-	flag.Parse()
+	cfg := config.ParseServerFlags()
 
-	storage := repository.NewMemStorage()
-	service := service.NewMetricService(storage)
-	handler := handler.NewMetricHandler(service, storage)
+	st := repository.NewMemStorage()
+	svc := service.NewMetricService(st)
+	h := handler.NewMetricHandler(svc, st)
 
 	r := chi.NewRouter()
-	r.Post("/update/{type}/{name}/{value}", handler.Update)
-	r.Get("/value/{type}/{name}", handler.GetValue)
-	r.Get("/", handler.GetAllMetrics)
+	r.Post("/update/{type}/{name}/{value}", h.Update)
+	r.Get("/value/{type}/{name}", h.GetValue)
+	r.Get("/", h.GetAllMetrics)
 
-	fmt.Printf("Server running on %s\n", *addr)
-	log.Fatal(http.ListenAndServe(*addr, r))
+	log.Printf("server running on %s", cfg.Addr)
+	log.Fatal(http.ListenAndServe(cfg.Addr, r))
 }

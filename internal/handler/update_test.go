@@ -37,7 +37,7 @@ func TestUpdateHandler_OK(t *testing.T) {
 	h.Update(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 OK, got %d", res.StatusCode)
@@ -65,14 +65,17 @@ func TestGetValueHandler_OK(t *testing.T) {
 	h.GetValue(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 
 	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("expected 200 OK, got %d: %s", res.StatusCode, string(body))
 	}
 
-	body, _ := io.ReadAll(res.Body)
 	if !strings.Contains(string(body), "123.45") {
 		t.Fatalf("unexpected body: %s", body)
 	}

@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -32,7 +33,19 @@ func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 		case service.ErrUnknownType, service.ErrBadValue:
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			if err := h.svc.Update(mtype, name, value); err != nil {
+				switch err {
+				case service.ErrNoName:
+					http.NotFound(w, r)
+				case service.ErrUnknownType, service.ErrBadValue:
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				default:
+					log.Printf("internal error on Update: %v", err)
+					http.Error(w, "internal error", http.StatusInternalServerError)
+				}
+				return
+			}
+
 		}
 		return
 	}
@@ -60,6 +73,7 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
 	}
 }
 

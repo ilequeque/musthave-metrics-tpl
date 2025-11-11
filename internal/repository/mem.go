@@ -18,7 +18,7 @@ type Storage interface {
 	GetAllCounters() map[string]int64
 }
 type MemStorage struct {
-	mu       sync.RWMutex
+	mu       sync.Mutex
 	gauges   map[string]float64
 	counters map[string]int64
 }
@@ -31,21 +31,30 @@ func NewMemStorage() *MemStorage {
 }
 func (m *MemStorage) UpdateGauge(name string, value float64) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.gauges[name] = value
-	m.mu.Unlock()
 }
 
 func (m *MemStorage) UpdateCounter(name string, delta int64) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.counters[name] += delta
-	m.mu.Unlock()
 }
+
 func (m *MemStorage) GetGauge(name string) (float64, bool) {
-	m.mu.RLock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	v, ok := m.gauges[name]
-	m.mu.RUnlock()
 	return v, ok
 }
+
+func (m *MemStorage) GetCounter(name string) (int64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v, ok := m.counters[name]
+	return v, ok
+}
+
 func (m *MemStorage) GetAllGauges() map[string]float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -55,13 +64,6 @@ func (m *MemStorage) GetAllGauges() map[string]float64 {
 		res[k] = v
 	}
 	return res
-}
-
-func (m *MemStorage) GetCounter(name string) (int64, bool) {
-	m.mu.RLock()
-	v, ok := m.counters[name]
-	m.mu.RUnlock()
-	return v, ok
 }
 
 func (m *MemStorage) GetAllCounters() map[string]int64 {
