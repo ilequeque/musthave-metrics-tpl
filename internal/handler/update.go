@@ -13,12 +13,12 @@ import (
 )
 
 type MetricHandler struct {
-	svc service.MetricService
+	svc *service.MetricService
 	st  repository.Storage
 }
 
-func NewMetricHandler(svc *service.MetricService, st *repository.MemStorage) *MetricHandler {
-	return &MetricHandler{svc: *svc, st: st}
+func NewMetricHandler(svc *service.MetricService, st repository.Storage) *MetricHandler {
+	return &MetricHandler{svc: svc, st: st}
 }
 
 func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -26,29 +26,20 @@ func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 
-	if err := h.svc.Update(mtype, name, value); err != nil {
+	err := h.svc.Update(mtype, name, value)
+	if err != nil {
 		switch err {
 		case service.ErrNoName:
 			http.NotFound(w, r)
 		case service.ErrUnknownType, service.ErrBadValue:
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
-			if err := h.svc.Update(mtype, name, value); err != nil {
-				switch err {
-				case service.ErrNoName:
-					http.NotFound(w, r)
-				case service.ErrUnknownType, service.ErrBadValue:
-					http.Error(w, err.Error(), http.StatusBadRequest)
-				default:
-					log.Printf("internal error on Update: %v", err)
-					http.Error(w, "internal error", http.StatusInternalServerError)
-				}
-				return
-			}
-
+			log.Printf("internal error on Update: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -60,10 +51,11 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 	case repository.Gauge:
 		if val, ok := h.st.GetGauge(name); ok {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "%g", val) // ✅ меняем %f → %g
+			fmt.Fprintf(w, "%g", val) // используем %g, чтобы избежать лишних нулей
 		} else {
 			http.NotFound(w, r)
 		}
+
 	case repository.Counter:
 		if val, ok := h.st.GetCounter(name); ok {
 			w.WriteHeader(http.StatusOK)
@@ -71,9 +63,9 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 		} else {
 			http.NotFound(w, r)
 		}
+
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
-		return
 	}
 }
 
@@ -90,7 +82,7 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		data = append(data, metricView{
 			Name:  name,
 			Type:  "gauge",
-			Value: strconv.FormatFloat(value, 'f', 4, 64),
+			Value: strconv.FormatFloat(value, 'f', -1, 64),
 		})
 	}
 
@@ -98,7 +90,7 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		data = append(data, metricView{
 			Name:  name,
 			Type:  "counter",
-			Value: fmt.Sprintf("%d", value),
+			Value: strconv.FormatInt(value, 10),
 		})
 	}
 
@@ -115,10 +107,12 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	{{end}}
 	</table>
 	</body>
-	</html>
-	`
+	</html>`
 
 	t := template.Must(template.New("metrics").Parse(tmpl))
+
 	w.WriteHeader(http.StatusOK)
-	t.Execute(w, data)
+	if err := t.Execute(w, data); err != nil {
+		log.Printf("failed to render template: %v", err)
+	}
 }
