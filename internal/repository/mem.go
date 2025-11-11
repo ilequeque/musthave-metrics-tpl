@@ -1,12 +1,7 @@
 package repository
 
-import "sync"
-
-type MetricType string
-
-const (
-	Gauge   MetricType = "gauge"
-	Counter MetricType = "counter"
+import (
+	"sync"
 )
 
 type Storage interface {
@@ -17,6 +12,7 @@ type Storage interface {
 	GetAllGauges() map[string]float64
 	GetAllCounters() map[string]int64
 }
+
 type MemStorage struct {
 	mu       sync.Mutex
 	gauges   map[string]float64
@@ -29,6 +25,7 @@ func NewMemStorage() *MemStorage {
 		counters: make(map[string]int64),
 	}
 }
+
 func (m *MemStorage) UpdateGauge(name string, value float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -56,10 +53,10 @@ func (m *MemStorage) GetCounter(name string) (int64, bool) {
 }
 
 func (m *MemStorage) GetAllGauges() map[string]float64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	res := make(map[string]float64)
+	res := make(map[string]float64, len(m.gauges))
 	for k, v := range m.gauges {
 		res[k] = v
 	}
@@ -67,9 +64,10 @@ func (m *MemStorage) GetAllGauges() map[string]float64 {
 }
 
 func (m *MemStorage) GetAllCounters() map[string]int64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	res := make(map[string]int64)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	res := make(map[string]int64, len(m.counters))
 	for k, v := range m.counters {
 		res[k] = v
 	}
