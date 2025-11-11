@@ -4,6 +4,13 @@ import (
 	"sync"
 )
 
+type MetricType string
+
+const (
+	Gauge   MetricType = "gauge"
+	Counter MetricType = "counter"
+)
+
 type Storage interface {
 	UpdateGauge(name string, value float64)
 	UpdateCounter(name string, delta int64)
