@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/ilequeque/musthave-metrics-tpl/internal/repository"
@@ -30,7 +31,7 @@ func (s *MetricService) Update(mtype, name, rawValue string) error {
 	case repository.Gauge:
 		v, err := strconv.ParseFloat(rawValue, 64)
 		if err != nil {
-			return ErrBadValue
+			return fmt.Errorf("invalid gauge value %q: %w", rawValue, ErrBadValue)
 		}
 		s.st.UpdateGauge(name, v)
 		return nil
@@ -38,7 +39,7 @@ func (s *MetricService) Update(mtype, name, rawValue string) error {
 	case repository.Counter:
 		delta, err := strconv.ParseInt(rawValue, 10, 64)
 		if err != nil {
-			return ErrBadValue
+			return fmt.Errorf("invalid counter value %q: %w", rawValue, ErrBadValue)
 		}
 		s.st.UpdateCounter(name, delta)
 		return nil
