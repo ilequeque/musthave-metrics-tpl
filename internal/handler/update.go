@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -25,17 +27,20 @@ func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 
-	if err := h.svc.Update(mtype, name, value); err != nil {
-		switch err {
-		case service.ErrNoName:
+	err := h.svc.Update(mtype, name, value)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoName):
 			http.NotFound(w, r)
-		case service.ErrUnknownType, service.ErrBadValue:
+		case errors.Is(err, service.ErrUnknownType), errors.Is(err, service.ErrBadValue):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
+			log.Printf("internal error on Update: %v", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -47,7 +52,8 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 	case repository.Gauge:
 		if val, ok := h.st.GetGauge(name); ok {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "%f", val)
+			str := strconv.FormatFloat(val, 'f', -1, 64)
+			fmt.Fprint(w, str)
 		} else {
 			http.NotFound(w, r)
 		}
@@ -60,6 +66,7 @@ func (h *MetricHandler) GetValue(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
 	}
 }
 
@@ -76,7 +83,7 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		data = append(data, metricView{
 			Name:  name,
 			Type:  "gauge",
-			Value: strconv.FormatFloat(value, 'f', 4, 64),
+			Value: strconv.FormatFloat(value, 'f', 6, 64),
 		})
 	}
 
@@ -104,7 +111,18 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	</html>
 	`
 
-	t := template.Must(template.New("metrics").Parse(tmpl))
+	t, err := template.New("metrics").Parse(tmpl)
+	if err != nil {
+		log.Printf("template parse error: %v", err)
+		http.Error(w, "internal template error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := t.Execute(w, data); err != nil {
+		log.Printf("template execute error: %v", err)
+		http.Error(w, "internal template render error", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-	t.Execute(w, data)
 }
