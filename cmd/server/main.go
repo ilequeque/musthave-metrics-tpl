@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/handler"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/repository"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/service"
@@ -12,14 +14,14 @@ import (
 func main() {
 	storage := repository.NewMemStorage()
 	service := service.NewMetricService(storage)
-	handler := handler.NewMetricHandler(service)
+	handler := handler.NewMetricHandler(service, storage)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/update/", handler.Update)
-	mux.HandleFunc("/update", handler.Update)
+	r := chi.NewRouter()
 
-	log.Println("Server running on :8080")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatal(err)
-	}
+	r.Post("/update/{type}/{name}/{value}", handler.Update)
+	r.Get("/value/{type}/{name}", handler.GetValue)
+	r.Get("/", handler.GetAllMetrics)
+
+	fmt.Println("Server running on :8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
