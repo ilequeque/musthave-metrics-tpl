@@ -24,5 +24,7 @@ func main() {
 	r.Get("/", h.GetAllMetrics)
 
 	log.Printf("server running on %s", cfg.Addr)
-	log.Fatal(http.ListenAndServe(cfg.Addr, r))
+	if err := http.ListenAndServe(cfg.Addr, r); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }
