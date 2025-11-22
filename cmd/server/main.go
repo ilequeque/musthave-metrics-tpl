@@ -29,6 +29,7 @@ func main() {
 
 	r.Use(middleware.LoggerMiddleware)
 	r.Use(middleware.StripTrailingSlash)
+	r.Use(middleware.GzipMiddleware)
 
 	r.Post("/update/{type}/{name}/{value}", h.Update)
 	r.Get("/value/{type}/{name}", h.GetValue)
