@@ -28,6 +28,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Use(middleware.LoggerMiddleware)
+	r.Use(middleware.StripTrailingSlash)
 
 	r.Post("/update/{type}/{name}/{value}", h.Update)
 	r.Get("/value/{type}/{name}", h.GetValue)
