@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/config"
@@ -22,9 +23,22 @@ func main() {
 	logrus.SetLevel(logrus.InfoLevel)
 
 	st := repository.NewMemStorage()
+	fs := repository.NewFileStorage(st, cfg.FileStorage, time.Duration(cfg.StoreInterval)*time.Second)
+
+	if cfg.Restore {
+		if err := fs.LoadFromFile(); err != nil {
+			logrus.Warnf("restore failed: %v", err)
+		}
+	}
+
+	if cfg.StoreInterval > 0 {
+		fs.RunAutosave()
+		defer fs.Stop()
+	}
+
 	svc := service.NewMetricService(st)
 	h := handler.NewMetricHandler(svc, st)
-
+	
 	r := chi.NewRouter()
 
 	r.Use(middleware.LoggerMiddleware)
