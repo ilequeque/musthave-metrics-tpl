@@ -32,6 +32,8 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", h.Update)
 	r.Get("/value/{type}/{name}", h.GetValue)
 	r.Get("/", h.GetAllMetrics)
+	r.Post("/update", h.UpdateJSON)
+	r.Post("/value", h.GetValueJSON)
 
 	logrus.Infof("server running on %s", cfg.Addr)
 	log.Fatal(http.ListenAndServe(cfg.Addr, r))
