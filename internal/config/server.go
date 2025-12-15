@@ -1,13 +1,25 @@
 package config
 
-import "flag"
+import (
+	"flag"
+	"os"
+)
 
 type ServerConfig struct {
 	Addr string
 }
 
-func ParseServerFlags() ServerConfig {
-	addr := flag.String("a", "localhost:8080", "address for HTTP server")
+func ParseServerFlags() *ServerConfig {
+	const defaultAddr = "localhost:8080"
+
+	addr := flag.String("a", defaultAddr, "address for HTTP server")
 	flag.Parse()
-	return ServerConfig{Addr: *addr}
+
+	cfg := &ServerConfig{Addr: *addr}
+
+	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
+		cfg.Addr = envAddr
+	}
+
+	return cfg
 }
