@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ilequeque/musthave-metrics-tpl/internal/model"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/repository"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/service"
 )
@@ -125,4 +127,66 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
+	var m model.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	switch m.MType {
+	case model.Gauge:
+		if m.Value == nil {
+			http.Error(w, "missing value for gauge", http.StatusBadRequest)
+			return
+		}
+		h.st.UpdateGauge(m.ID, *m.Value)
+	case model.Counter:
+		if m.Delta == nil {
+			http.Error(w, "missing delta for counter", http.StatusBadRequest)
+			return
+		}
+		h.st.UpdateCounter(m.ID, *m.Delta)
+	default:
+		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(m)
+}
+
+func (h *MetricHandler) GetValueJSON(w http.ResponseWriter, r *http.Request) {
+	var m model.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	switch m.MType {
+	case model.Gauge:
+		if val, ok := h.st.GetGauge(m.ID); ok {
+			m.Value = &val
+		} else {
+			http.NotFound(w, r)
+			return
+		}
+	case model.Counter:
+		if val, ok := h.st.GetCounter(m.ID); ok {
+			m.Delta = &val
+		} else {
+			http.NotFound(w, r)
+			return
+		}
+	default:
+		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(m)
 }
