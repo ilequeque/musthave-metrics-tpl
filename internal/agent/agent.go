@@ -98,23 +98,58 @@ func collectRuntime(dst map[string]float64) {
 func randomGauge() float64 { return float64(time.Now().UnixNano()%1_000_000) / 1_000_000 }
 
 func (r *Runner) sendMetric(metricType, name string, value any) error {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", r.addr, metricType, name, value)
-	req, err := http.NewRequest(http.MethodPost, url, nil)
-	if err != nil {
-		return fmt.Errorf("request create: %w", err)
-	}
-	req.Header.Set("Content-Type", "text/plain")
+	url := fmt.Sprintf("%s/update", r.addr)
 
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("do request: %w", err)
+	var metric struct {
+		ID    string   `json:"id"`
+		MType string   `json:"type"`
+		Delta *int64   `json:"delta,omitempty"`
+		Value *float64 `json:"value,omitempty"`
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	metric.ID = name
+	metric.MType = metricType
+
+	switch metricType {
+	case "gauge":
+		v := toFloat64(value)
+		metric.Value = &v
+	case "counter":
+		d := toInt64(value)
+		metric.Delta = &d
+	default:
+		return fmt.Errorf("unknown metric type: %s", metricType)
 	}
+
+	if err := sendJSONGzip(r.client, url, metric); err != nil {
+		return fmt.Errorf("send gzip json: %w", err)
+	}
+
 	return nil
+}
+
+func toFloat64(v any) float64 {
+	switch t := v.(type) {
+	case float64:
+		return t
+	case int64:
+		return float64(t)
+	case int:
+		return float64(t)
+	default:
+		return 0
+	}
+}
+
+func toInt64(v any) int64 {
+	switch t := v.(type) {
+	case int64:
+		return t
+	case int:
+		return int64(t)
+	case float64:
+		return int64(t)
+	default:
+		return 0
+	}
 }

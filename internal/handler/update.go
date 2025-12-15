@@ -120,13 +120,14 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
 	if err := t.Execute(w, data); err != nil {
 		log.Printf("template execute error: %v", err)
 		http.Error(w, "internal template render error", http.StatusInternalServerError)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
