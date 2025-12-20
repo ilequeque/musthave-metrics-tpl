@@ -11,6 +11,7 @@ type ServerConfig struct {
 	StoreInterval int
 	FileStorage   string
 	Restore       bool
+	DatabaseDSN   string
 }
 
 func ParseServerFlags() ServerConfig {
@@ -18,13 +19,17 @@ func ParseServerFlags() ServerConfig {
 	store := flag.Int("i", 300, "store interval in seconds (0 = sync write)")
 	file := flag.String("f", "/tmp/metrics-db.json", "path to file for metrics storage")
 	restore := flag.Bool("r", true, "restore metrics from file on startup")
+
+	dsn := flag.String("d", "", "PostgreSQL DSN")
+
 	flag.Parse()
-	
+
 	cfg := ServerConfig{
 		Addr:          *addr,
 		StoreInterval: *store,
 		FileStorage:   *file,
 		Restore:       *restore,
+		DatabaseDSN:   *dsn,
 	}
 
 	if v := os.Getenv("ADDRESS"); v != "" {
@@ -39,7 +44,13 @@ func ParseServerFlags() ServerConfig {
 		cfg.FileStorage = v
 	}
 	if v := os.Getenv("RESTORE"); v != "" {
-		cfg.Restore = v == "true"
+		if b, err := strconv.ParseBool(v); err == nil {
+			cfg.Restore = b
+		}
+	}
+
+	if v := os.Getenv("DATABASE_DSN"); v != "" {
+		cfg.DatabaseDSN = v
 	}
 
 	return cfg

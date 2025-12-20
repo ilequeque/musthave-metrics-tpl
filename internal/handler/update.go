@@ -18,10 +18,23 @@ import (
 type MetricHandler struct {
 	svc service.MetricService
 	st  repository.Storage
+	db  DBPinger
 }
 
-func NewMetricHandler(svc *service.MetricService, st *repository.MemStorage) *MetricHandler {
-	return &MetricHandler{svc: *svc, st: st}
+func NewMetricHandler(
+	svc *service.MetricService,
+	st repository.Storage,
+	db DBPinger,
+) *MetricHandler {
+	return &MetricHandler{
+		svc: *svc,
+		st:  st,
+		db:  db,
+	}
+}
+
+type DBPinger interface {
+	Ping() error
 }
 
 func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +53,20 @@ func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 			log.Printf("internal error on Update: %v", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
+	if h.db == nil {
+		http.Error(w, "database not configured", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.db.Ping(); err != nil {
+		http.Error(w, "database not reachable", http.StatusInternalServerError)
 		return
 	}
 
