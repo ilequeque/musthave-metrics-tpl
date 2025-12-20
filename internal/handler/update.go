@@ -24,12 +24,17 @@ type MetricHandler struct {
 func NewMetricHandler(
 	svc *service.MetricService,
 	st repository.Storage,
-	db DBPinger,
+	db ...DBPinger,
 ) *MetricHandler {
+	var pinger DBPinger
+	if len(db) > 0 {
+		pinger = db[0]
+	}
+
 	return &MetricHandler{
 		svc: *svc,
 		st:  st,
-		db:  db,
+		db:  pinger,
 	}
 }
 
