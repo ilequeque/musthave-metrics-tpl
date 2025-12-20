@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ilequeque/musthave-metrics-tpl/internal/model"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/repository"
 	"github.com/ilequeque/musthave-metrics-tpl/internal/service"
 )
@@ -16,10 +18,28 @@ import (
 type MetricHandler struct {
 	svc service.MetricService
 	st  repository.Storage
+	db  DBPinger
 }
 
-func NewMetricHandler(svc *service.MetricService, st *repository.MemStorage) *MetricHandler {
-	return &MetricHandler{svc: *svc, st: st}
+func NewMetricHandler(
+	svc *service.MetricService,
+	st repository.Storage,
+	db ...DBPinger,
+) *MetricHandler {
+	var pinger DBPinger
+	if len(db) > 0 {
+		pinger = db[0]
+	}
+
+	return &MetricHandler{
+		svc: *svc,
+		st:  st,
+		db:  pinger,
+	}
+}
+
+type DBPinger interface {
+	Ping() error
 }
 
 func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +58,20 @@ func (h *MetricHandler) Update(w http.ResponseWriter, r *http.Request) {
 			log.Printf("internal error on Update: %v", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
+	if h.db == nil {
+		http.Error(w, "database not configured", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.db.Ping(); err != nil {
+		http.Error(w, "database not reachable", http.StatusInternalServerError)
 		return
 	}
 
@@ -118,11 +152,74 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
 	if err := t.Execute(w, data); err != nil {
 		log.Printf("template execute error: %v", err)
 		http.Error(w, "internal template render error", http.StatusInternalServerError)
 		return
 	}
+}
 
+func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
+	var m model.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	switch m.MType {
+	case model.Gauge:
+		if m.Value == nil {
+			http.Error(w, "missing value for gauge", http.StatusBadRequest)
+			return
+		}
+		h.st.UpdateGauge(m.ID, *m.Value)
+	case model.Counter:
+		if m.Delta == nil {
+			http.Error(w, "missing delta for counter", http.StatusBadRequest)
+			return
+		}
+		h.st.UpdateCounter(m.ID, *m.Delta)
+	default:
+		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(m)
+}
+
+func (h *MetricHandler) GetValueJSON(w http.ResponseWriter, r *http.Request) {
+	var m model.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	switch m.MType {
+	case model.Gauge:
+		if val, ok := h.st.GetGauge(m.ID); ok {
+			m.Value = &val
+		} else {
+			http.NotFound(w, r)
+			return
+		}
+	case model.Counter:
+		if val, ok := h.st.GetCounter(m.ID); ok {
+			m.Delta = &val
+		} else {
+			http.NotFound(w, r)
+			return
+		}
+	default:
+		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(m)
 }
