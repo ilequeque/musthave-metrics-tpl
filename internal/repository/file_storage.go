@@ -17,13 +17,24 @@ type FileStorage struct {
 	wg       sync.WaitGroup
 }
 
-func NewFileStorage(mem *MemStorage, path string, interval time.Duration) *FileStorage {
-	return &FileStorage{
+func NewFileStorage(path string, interval time.Duration, restore bool) (*FileStorage, error) {
+	mem := NewMemStorage()
+
+	fs := &FileStorage{
 		path:     path,
 		interval: interval,
 		mem:      mem,
 		stopCh:   make(chan struct{}),
 	}
+
+	if restore {
+		if err := fs.LoadFromFile(); err != nil {
+			return nil, err
+		}
+	}
+
+	fs.RunAutosave()
+	return fs, nil
 }
 
 func (fs *FileStorage) LoadFromFile() error {
@@ -108,4 +119,33 @@ func (fs *FileStorage) RunAutosave() {
 func (fs *FileStorage) Stop() {
 	close(fs.stopCh)
 	fs.wg.Wait()
+}
+func (fs *FileStorage) UpdateGauge(name string, value float64) {
+	fs.mem.UpdateGauge(name, value)
+	if fs.interval == 0 {
+		_ = fs.SaveToFile()
+	}
+}
+
+func (fs *FileStorage) UpdateCounter(name string, delta int64) {
+	fs.mem.UpdateCounter(name, delta)
+	if fs.interval == 0 {
+		_ = fs.SaveToFile()
+	}
+}
+
+func (fs *FileStorage) GetGauge(name string) (float64, bool) {
+	return fs.mem.GetGauge(name)
+}
+
+func (fs *FileStorage) GetCounter(name string) (int64, bool) {
+	return fs.mem.GetCounter(name)
+}
+
+func (fs *FileStorage) GetAllGauges() map[string]float64 {
+	return fs.mem.GetAllGauges()
+}
+
+func (fs *FileStorage) GetAllCounters() map[string]int64 {
+	return fs.mem.GetAllCounters()
 }

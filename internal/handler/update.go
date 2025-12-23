@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -163,8 +165,20 @@ func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
+	var reader io.Reader = r.Body
+
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, "invalid gzip", http.StatusBadRequest)
+			return
+		}
+		defer gz.Close()
+		reader = gz
+	}
+
 	var m model.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+	if err := json.NewDecoder(reader).Decode(&m); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -176,20 +190,20 @@ func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.st.UpdateGauge(m.ID, *m.Value)
+
 	case model.Counter:
 		if m.Delta == nil {
 			http.Error(w, "missing delta for counter", http.StatusBadRequest)
 			return
 		}
 		h.st.UpdateCounter(m.ID, *m.Delta)
+
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(m)
 }
 
 func (h *MetricHandler) GetValueJSON(w http.ResponseWriter, r *http.Request) {
