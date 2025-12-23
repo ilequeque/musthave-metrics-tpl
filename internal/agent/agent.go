@@ -40,9 +40,9 @@ func (r *Runner) Run() {
 	for {
 		select {
 		case <-r.pollTicker.C:
-			collectRuntime(metrics)                // gauge
-			metrics["RandomValue"] = randomGauge() // gauge
-			r.pollDelta++                          // считаем ДЕЛЬТУ опросов с прошлого отчёта
+			collectRuntime(metrics)
+			metrics["RandomValue"] = randomGauge()
+			r.pollDelta++
 
 		case <-r.reportTicker.C:
 			for name, value := range metrics {
@@ -58,7 +58,6 @@ func (r *Runner) Run() {
 					r.pollDelta = 0
 				}
 			}
-			log.Printf("metrics sent to %s", r.addr)
 		}
 	}
 }
