@@ -9,13 +9,14 @@ type PostgresStorage struct {
 }
 
 func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
-	s := &PostgresStorage{db: db}
-	if err := s.migrate(); err != nil {
+	ps := &PostgresStorage{db: db}
+	if err := ps.migrate(); err != nil {
 		return nil, err
 	}
-	return s, nil
+	return ps, nil
 }
-func (s *PostgresStorage) migrate() error {
+
+func (ps *PostgresStorage) migrate() error {
 	const q = `
 	CREATE TABLE IF NOT EXISTS metrics (
 		id TEXT PRIMARY KEY,
@@ -23,47 +24,52 @@ func (s *PostgresStorage) migrate() error {
 		gauge DOUBLE PRECISION,
 		counter BIGINT
 	);`
-	_, err := s.db.Exec(q)
+	_, err := ps.db.Exec(q)
 	return err
 }
-func (s *PostgresStorage) UpdateGauge(name string, value float64) {
+
+func (ps *PostgresStorage) UpdateGauge(name string, value float64) {
 	const q = `
 	INSERT INTO metrics (id, type, gauge)
 	VALUES ($1, 'gauge', $2)
 	ON CONFLICT (id)
 	DO UPDATE SET gauge = EXCLUDED.gauge;`
-
-	_, _ = s.db.Exec(q, name, value)
+	_, _ = ps.db.Exec(q, name, value)
 }
-func (s *PostgresStorage) UpdateCounter(name string, delta int64) {
+
+func (ps *PostgresStorage) UpdateCounter(name string, delta int64) {
 	const q = `
 	INSERT INTO metrics (id, type, counter)
 	VALUES ($1, 'counter', $2)
 	ON CONFLICT (id)
 	DO UPDATE SET counter = metrics.counter + EXCLUDED.counter;`
-
-	_, _ = s.db.Exec(q, name, delta)
+	_, _ = ps.db.Exec(q, name, delta)
 }
-func (s *PostgresStorage) GetGauge(name string) (float64, bool) {
+
+func (ps *PostgresStorage) GetGauge(name string) (float64, bool) {
 	var v sql.NullFloat64
-	err := s.db.QueryRow(
+	err := ps.db.QueryRow(
 		`SELECT gauge FROM metrics WHERE id=$1 AND type='gauge'`,
 		name,
 	).Scan(&v)
 
 	return v.Float64, err == nil && v.Valid
 }
-func (s *PostgresStorage) GetCounter(name string) (int64, bool) {
+
+func (ps *PostgresStorage) GetCounter(name string) (int64, bool) {
 	var v sql.NullInt64
-	err := s.db.QueryRow(
+	err := ps.db.QueryRow(
 		`SELECT counter FROM metrics WHERE id=$1 AND type='counter'`,
 		name,
 	).Scan(&v)
 
 	return v.Int64, err == nil && v.Valid
 }
+
 func (ps *PostgresStorage) GetAllGauges() map[string]float64 {
-	rows, err := ps.db.Query(`SELECT id, value FROM gauges`)
+	rows, err := ps.db.Query(
+		`SELECT id, gauge FROM metrics WHERE type='gauge'`,
+	)
 	if err != nil {
 		return map[string]float64{}
 	}
@@ -77,11 +83,18 @@ func (ps *PostgresStorage) GetAllGauges() map[string]float64 {
 			result[id] = val
 		}
 	}
+
+	if err := rows.Err(); err != nil {
+		return map[string]float64{}
+	}
+
 	return result
 }
 
 func (ps *PostgresStorage) GetAllCounters() map[string]int64 {
-	rows, err := ps.db.Query(`SELECT id, delta FROM counters`)
+	rows, err := ps.db.Query(
+		`SELECT id, counter FROM metrics WHERE type='counter'`,
+	)
 	if err != nil {
 		return map[string]int64{}
 	}
@@ -95,5 +108,10 @@ func (ps *PostgresStorage) GetAllCounters() map[string]int64 {
 			result[id] = val
 		}
 	}
+
+	if err := rows.Err(); err != nil {
+		return map[string]int64{}
+	}
+
 	return result
 }
