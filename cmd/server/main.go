@@ -71,6 +71,7 @@ func main() {
 	r.Get("/", h.GetAllMetrics)
 	r.Post("/update", h.UpdateJSON)
 	r.Post("/update/", h.UpdateJSON)
+	r.Post("/updates/", h.UpdateBatchJSON)
 
 	r.Post("/value", h.GetValueJSON)
 	r.Post("/value/", h.GetValueJSON)

@@ -149,3 +149,18 @@ func (fs *FileStorage) GetAllGauges() map[string]float64 {
 func (fs *FileStorage) GetAllCounters() map[string]int64 {
 	return fs.mem.GetAllCounters()
 }
+func (fs *FileStorage) UpdateBatch(metrics []model.Metrics) error {
+	for _, m := range metrics {
+		switch m.MType {
+		case model.Gauge:
+			if m.Value != nil {
+				fs.mem.UpdateGauge(m.ID, *m.Value)
+			}
+		case model.Counter:
+			if m.Delta != nil {
+				fs.mem.UpdateCounter(m.ID, *m.Delta)
+			}
+		}
+	}
+	return nil
+}

@@ -237,3 +237,38 @@ func (h *MetricHandler) GetValueJSON(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(m)
 }
+func (h *MetricHandler) UpdateBatchJSON(w http.ResponseWriter, r *http.Request) {
+	var batch []model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(batch) == 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if bs, ok := h.st.(repository.BatchUpdater); ok {
+		if err := bs.UpdateBatch(batch); err != nil {
+			http.Error(w, "batch update failed", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		for _, m := range batch {
+			switch m.MType {
+			case model.Gauge:
+				if m.Value != nil {
+					h.st.UpdateGauge(m.ID, *m.Value)
+				}
+			case model.Counter:
+				if m.Delta != nil {
+					h.st.UpdateCounter(m.ID, *m.Delta)
+				}
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
