@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgerrcode"
 	_ "github.com/lib/pq"
 )
 

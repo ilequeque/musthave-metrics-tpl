@@ -173,10 +173,16 @@ func (s *PostgresStorage) UpdateBatch(metrics []model.Metrics) error {
 
 	return tx.Commit()
 }
+
 func isRetriablePGError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) {
-		return pgerrcode.IsConnectionException(pqErr.Code)
+		return pgerrcode.IsConnectionException(string(pqErr.Code))
 	}
+
 	return false
 }
