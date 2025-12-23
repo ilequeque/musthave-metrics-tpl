@@ -97,7 +97,7 @@ func collectRuntime(dst map[string]float64) {
 func randomGauge() float64 { return float64(time.Now().UnixNano()%1_000_000) / 1_000_000 }
 
 func (r *Runner) sendMetric(metricType, name string, value any) error {
-	url := fmt.Sprintf("%s/update/", r.addr)
+	url := fmt.Sprintf("%s/update", r.addr)
 
 	var metric struct {
 		ID    string   `json:"id"`

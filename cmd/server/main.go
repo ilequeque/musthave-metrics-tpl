@@ -69,7 +69,11 @@ func main() {
 	r.Get("/value/{type}/{name}", h.GetValue)
 	r.Get("/", h.GetAllMetrics)
 	r.Post("/update", h.UpdateJSON)
+	r.Post("/update/", h.UpdateJSON)
+
 	r.Post("/value", h.GetValueJSON)
+	r.Post("/value/", h.GetValueJSON)
+
 	r.Get("/ping", h.PingDB)
 
 	logrus.Infof("server running on %s", cfg.Addr)
