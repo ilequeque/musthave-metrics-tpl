@@ -2,8 +2,11 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/ilequeque/musthave-metrics-tpl/internal/model"
+	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
 )
 
 type PostgresStorage struct {
@@ -36,7 +39,14 @@ func (ps *PostgresStorage) UpdateGauge(name string, value float64) {
 	VALUES ($1, 'gauge', $2)
 	ON CONFLICT (id)
 	DO UPDATE SET gauge = EXCLUDED.gauge;`
-	_, _ = ps.db.Exec(q, name, value)
+
+	_ = retry(func() error {
+		_, err := ps.db.Exec(q, name, value)
+		if isRetriablePGError(err) {
+			return err
+		}
+		return nil
+	})
 }
 
 func (ps *PostgresStorage) UpdateCounter(name string, delta int64) {
@@ -45,7 +55,13 @@ func (ps *PostgresStorage) UpdateCounter(name string, delta int64) {
 	VALUES ($1, 'counter', $2)
 	ON CONFLICT (id)
 	DO UPDATE SET counter = metrics.counter + EXCLUDED.counter;`
-	_, _ = ps.db.Exec(q, name, delta)
+	_ = retry(func() error {
+		_, err := ps.db.Exec(q, name, delta)
+		if isRetriablePGError(err) {
+			return err
+		}
+		return nil
+	})
 }
 
 func (ps *PostgresStorage) GetGauge(name string) (float64, bool) {
@@ -156,4 +172,11 @@ func (s *PostgresStorage) UpdateBatch(metrics []model.Metrics) error {
 	}
 
 	return tx.Commit()
+}
+func isRetriablePGError(err error) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pgerrcode.IsConnectionException(pqErr.Code)
+	}
+	return false
 }

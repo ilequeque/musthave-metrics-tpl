@@ -120,7 +120,9 @@ func (r *Runner) sendMetric(metricType, name string, value any) error {
 		return fmt.Errorf("unknown metric type: %s", metricType)
 	}
 
-	if err := sendJSONGzip(r.client, url, metric); err != nil {
+	if err := withRetry(func() error {
+		return sendJSONGzip(r.client, url, metric)
+	}); err != nil {
 		return fmt.Errorf("send gzip json: %w", err)
 	}
 
