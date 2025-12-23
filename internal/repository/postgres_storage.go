@@ -134,8 +134,8 @@ func (ps *PostgresStorage) GetAllCounters() map[string]int64 {
 	return result
 }
 
-func (s *PostgresStorage) UpdateBatch(metrics []model.Metrics) error {
-	tx, err := s.db.Begin()
+func (ps *PostgresStorage) UpdateBatch(metrics []model.Metrics) error {
+	tx, err := ps.db.Begin()
 	if err != nil {
 		return err
 	}
