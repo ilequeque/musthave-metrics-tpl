@@ -1,9 +1,7 @@
 package repository
 
 import (
-	"context"
 	"database/sql"
-	"fmt"
 )
 
 type PostgresStorage struct {
