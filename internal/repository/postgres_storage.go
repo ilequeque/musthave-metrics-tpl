@@ -2,6 +2,8 @@ package repository
 
 import (
 	"database/sql"
+
+	"github.com/ilequeque/musthave-metrics-tpl/internal/model"
 )
 
 type PostgresStorage struct {
@@ -114,4 +116,44 @@ func (ps *PostgresStorage) GetAllCounters() map[string]int64 {
 	}
 
 	return result
+}
+
+func (s *PostgresStorage) UpdateBatch(metrics []model.Metrics) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, m := range metrics {
+		switch m.MType {
+		case model.Gauge:
+			if m.Value == nil {
+				continue
+			}
+			_, err = tx.Exec(`
+				INSERT INTO metrics (id, type, gauge)
+				VALUES ($1, 'gauge', $2)
+				ON CONFLICT (id)
+				DO UPDATE SET gauge = EXCLUDED.gauge
+			`, m.ID, *m.Value)
+
+		case model.Counter:
+			if m.Delta == nil {
+				continue
+			}
+			_, err = tx.Exec(`
+				INSERT INTO metrics (id, type, counter)
+				VALUES ($1, 'counter', $2)
+				ON CONFLICT (id)
+				DO UPDATE SET counter = metrics.counter + EXCLUDED.counter
+			`, m.ID, *m.Delta)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
