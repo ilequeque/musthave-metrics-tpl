@@ -1,0 +1,16 @@
+package middleware
+
+import (
+	"net/http"
+	"strings"
+)
+
+func StripTrailingSlash(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if len(path) > 1 && strings.HasSuffix(path, "/") {
+			r.URL.Path = strings.TrimSuffix(path, "/")
+		}
+		next.ServeHTTP(w, r)
+	})
+}

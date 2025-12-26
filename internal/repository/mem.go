@@ -2,6 +2,8 @@ package repository
 
 import (
 	"sync"
+
+	"github.com/ilequeque/musthave-metrics-tpl/internal/model"
 )
 
 type MetricType string
@@ -79,4 +81,23 @@ func (m *MemStorage) GetAllCounters() map[string]int64 {
 		res[k] = v
 	}
 	return res
+}
+func (m *MemStorage) UpdateBatch(metrics []model.Metrics) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, metric := range metrics {
+		switch metric.MType {
+		case model.Gauge:
+			if metric.Value != nil {
+				m.gauges[metric.ID] = *metric.Value
+			}
+		case model.Counter:
+			if metric.Delta != nil {
+				m.counters[metric.ID] += *metric.Delta
+			}
+		}
+	}
+
+	return nil
 }
